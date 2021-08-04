@@ -28,7 +28,7 @@ dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 train_dl, test_dl = create_dataloaders(args)
 crit = nn.CrossEntropyLoss()
 
-reduced_w, pca = get_pca_model(args,dev))
+reduced_w, pca = get_pca_model(args,dev)
 plt.scatter(reduced_w[:,0],reduced_w[:,1])
 plt.savefig("./results/test.png")
 
