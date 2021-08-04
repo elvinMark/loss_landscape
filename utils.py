@@ -90,6 +90,7 @@ def train(model,train_dl,test_dl,crit,optim,sched,dev,args):
 
         if args.checkpoint!= -1 and args.checkpoint!=0 and epoch % args.checkpoint == 0:
             torch.save(model.state_dict(),args.path + f"_{epoch}")
+            torch.save(test_loss,args.path + f"_loss_{epoch}")
 
     logger({
         "best_test_acc" : best_acc

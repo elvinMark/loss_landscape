@@ -29,6 +29,7 @@ train_dl, test_dl = create_dataloaders(args)
 crit = nn.CrossEntropyLoss()
 
 reduced_w, pca = get_pca_model(args,dev)
+
 plt.scatter(reduced_w[:,0],reduced_w[:,1])
-plt.savefig("./results/test.png")
+plt.savefig("./results/%s.png"%args.experiment)
 
