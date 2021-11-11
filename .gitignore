@@ -3,6 +3,4 @@ output/
 wandb/
 log/
 results/
-train.sh
-test.sh
-landscape.sh
+*.sh
