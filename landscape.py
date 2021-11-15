@@ -4,8 +4,9 @@ import argparse
 import os
 from models import create_model
 from datasets import create_dataloaders
-from utils import get_pca_model
+from utils import get_landscape, create_random_directions, get_params_ref
 import matplotlib.pyplot as plt
+import pickle
 
 parser = argparse.ArgumentParser(
     description="train a model and visualize the loss landscape"
@@ -15,7 +16,7 @@ parser.add_argument(
     "--architecture",
     type=str,
     default="mlp",
-    choices=["mlp", "cnn"],
+    choices=["mlp", "cnn", "vgg9"],
     help="specify the network architecture that was used",
 )
 parser.add_argument(
@@ -47,15 +48,52 @@ parser.add_argument(
     help="specify the number of epochs used during training",
 )
 
+parser.add_argument(
+    "--range",
+    type=float,
+    nargs="+",
+    default=(-0.5, 0.5),
+    help="specify the range of the x and y",
+)
+
 args = parser.parse_args()
-args.path = os.path.join(args.path, args.experiment)
-
+args.path = os.path.join(args.path, args.experiment + "_last")
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-train_dl, test_dl = create_dataloaders(args)
+model = create_model(args).to(dev)
+model.load_state_dict(torch.load(args.path))
 crit = nn.CrossEntropyLoss()
+train_dl, test_dl = create_dataloaders(args)
+base_w = get_params_ref(model)
+alpha, beta = create_random_directions(base_w, dev)
+X, Y, Z = get_landscape(
+    model,
+    test_dl,
+    crit,
+    dev,
+    base_w,
+    alpha,
+    beta,
+    x_range=args.range,
+    y_range=args.range,
+)
 
-reduced_w, pca = get_pca_model(args, dev)
+data_ = {
+    "dataset": args.dataset,
+    "architecture": args.architecture,
+    "X": X,
+    "Y": Y,
+    "Z": Z,
+}
 
-plt.scatter(reduced_w[:, 0], reduced_w[:, 1])
-plt.savefig("./results/%s.png" % args.experiment)
+with open("data_", "wb") as f:
+    pickle.dump(data_, f)
+    f.close()
+
+plt.figure(1)
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+ax.plot_surface(X, Y, Z)
+plt.savefig(f"./results/{args.experiment}_surface.png")
+
+plt.figure(2)
+plt.contour(X, Y, Z)
+plt.savefig(f"./results/{args.experiment}_contour.png")

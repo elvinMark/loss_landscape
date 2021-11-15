@@ -32,52 +32,53 @@ class SmallIterator:
             raise StopIteration
 
 
-def get_parameters(model):
-    w = torch.tensor([])
+def create_random_directions(params_ref, dev):
+    alpha = []
+    beta = []
+    for param in params_ref:
+        alpha.append(torch.rand(param.shape).to(dev))
+        beta.append(torch.rand(param.shape).to(dev))
+    return alpha, beta
+
+
+def get_params_ref(model):
+    w = []
     for param in model.parameters():
-        w = torch.cat((w, param.clone().detach().view(-1).cpu()))
+        w.append(param.detach().clone())
     return w
 
 
-def modify_parameters(model, w):
-    idx = 0
-    for param in model.parameters():
-        tot_elem = torch.prod(torch.tensor(param.shape))
-        param.data = w[idx : idx + tot_elem].reshape(param.shape)
-        idx += tot_elem
+def update_model_params(model, params_ref, alpha, beta, gamma1, gamma2):
+    for param, w, a, b in zip(model.parameters(), params_ref, alpha, beta):
+        param.data = w + gamma1 * a + gamma2 * b
 
 
-def calculate_loss(model, test_dl, crit, dev):
-    test_loss = 0.0
-
-    for x, y in test_dl:
-        x = x.to(dev)
-        y = y.to(dev)
-        o = model(x)
-        l = crit(o, y)
-        test_loss += l
-
-    return test_loss
-
-
-def get_pca_model(args, dev):
-    w = []
-    for epoch in range(args.epochs):
-        if epoch % args.checkpoint == 0:
-            model = create_model(args).to(dev)
-            model.load_state_dict(torch.load(args.path + f"_{epoch}"))
-            w_ = get_parameters(model)
-            w.append(w_.detach().numpy())
-    w = np.array(w)
-    pca = PCA(n_components=2)
-    reduced_w = pca.fit_transform(w)
-    return reduced_w, pca
-
-
-def get_landscape(base_model, test_dl, crit, pca, dev):
-    base_w = get_parameters(base_model)
-    w_dir1 = torch.rand_like(base_w)
-    w_dir2 = torch.rand_like(base_w)
+def get_landscape(
+    base_model,
+    test_dl,
+    crit,
+    dev,
+    base_w,
+    alpha,
+    beta,
+    x_range=(-0.5, 0.5),
+    y_range=(-0.5, 0.5),
+    N=10,
+):
+    x = np.linspace(x_range[0], x_range[1], N)
+    y = np.linspace(y_range[0], y_range[1], N)
+    X, Y = np.meshgrid(x, y)
+    Z = []
+    for x_ in x:
+        tmp = []
+        for y_ in y:
+            update_model_params(base_model, base_w, alpha, beta, x_, y_)
+            l = validate(base_model, test_dl, crit, dev)
+            print(l)
+            tmp.append(l[0])
+        Z.append(tmp)
+    Z = np.array(Z).reshape((len(x), len(y)))
+    return X, Y, Z
 
 
 def train(model, train_dl, test_dl, crit, optim, sched, dev, args):
@@ -97,21 +98,45 @@ def train(model, train_dl, test_dl, crit, optim, sched, dev, args):
         correct = 0.0
 
         model.train()
+
         for idx, (x, y) in enumerate(train_dl):
             x = x.to(dev)
             y = y.to(dev)
             optim.zero_grad()
             si = SmallIterator(x, y)
             si_length = len(si)
+
+            if args.optim == "sam":
+                # prev_params = get_params_ref(model)
+                prev_params = [
+                    param.clone().detach().requires_grad_(True)
+                    for param in model.parameters()
+                ]
+
             for x_, y_ in si:
                 o = model(x_)
                 l = crit(o, y_)
                 l = l / si_length
                 l.backward()
-                train_loss += l
+                train_loss += float(l)
                 top1 = torch.argmax(o, axis=1)
                 correct += torch.sum(top1 == y_)
-            optim.step()
+
+            if args.optim == "sam":
+                optim.step_calc_w_adv()
+                optim.zero_grad()
+
+                for x_, y_ in si:
+                    o = model(x_)
+                    l = crit(o, y_)
+                    l = l / si_length
+                    l.backward()
+
+                optim.load_original_params_and_step(prev_params)
+
+            else:
+                optim.step()
+
             total += len(y)
 
         train_loss = train_loss / len(train_dl)
@@ -163,7 +188,7 @@ def validate(model, test_dl, crit, dev):
                 o = model(x_)
                 l = crit(o, y_)
             l = l / si_length
-            test_loss += l
+            test_loss += float(l)
             top1 = torch.argmax(o, axis=1)
             correct += torch.sum(top1 == y_)
         total += len(y)

@@ -3,4 +3,5 @@ output/
 wandb/
 log/
 results/
+data_landscape/
 *.sh
