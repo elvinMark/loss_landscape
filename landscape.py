@@ -94,7 +94,7 @@ data_ = {
     "Z": Z,
 }
 
-with open(f"data_${args.batch_size}_${args.optim}", "wb") as f:
+with open(f"data_{args.batch_size}_{args.optim}", "wb") as f:
     pickle.dump(data_, f)
     f.close()
 

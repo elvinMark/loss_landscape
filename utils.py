@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from sklearn.decomposition import PCA
 from models import create_model
 import math
 
-
+# Iterator used for pseudo large batch sizes
 class SmallIterator:
     def __init__(self, x, y, small_bs=128):
         self.x = x
@@ -32,6 +31,7 @@ class SmallIterator:
             raise StopIteration
 
 
+# Create random directions for landscape analysis
 def create_random_directions(params_ref, dev):
     alpha = []
     beta = []
@@ -41,6 +41,9 @@ def create_random_directions(params_ref, dev):
     return alpha, beta
 
 
+# get parameters of the model
+# WARNING: requires_grad of all clone parameters are set to False
+# DO NOT USE FOR TRAINING
 def get_params_ref(model):
     w = []
     for param in model.parameters():
@@ -48,6 +51,9 @@ def get_params_ref(model):
     return w
 
 
+# update model parametes
+# WARNING: requires_grad of all clone parameters are set to False
+# DO NOT USE FOR TRAINING
 def update_model_params(model, params_ref, alpha, beta, gamma1, gamma2):
     for param, w, a, b in zip(model.parameters(), params_ref, alpha, beta):
         param.data = w + gamma1 * a + gamma2 * b
