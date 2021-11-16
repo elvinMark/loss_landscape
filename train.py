@@ -125,12 +125,13 @@ parser.add_argument(
 parser.add_argument(
     "--nbs", type=float, default=0.01, help="specify the neighbourhood size"
 )
+parser.add_argument("--gpu", type=int, default=0, help="specify which gpu to use")
 
 args = parser.parse_args()
 args.T_max = args.epochs
 args.path = os.path.join(args.path, args.experiment)
 
-dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+dev = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
 
 model = create_model(args).to(dev)
 

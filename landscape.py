@@ -30,6 +30,13 @@ parser.add_argument(
     "--batch-size", type=int, default=128, help="specify the batch size"
 )
 parser.add_argument(
+    "--optim",
+    type=str,
+    default="sgd",
+    choices=["sgd", "sam"],
+    help="specify the optimizer",
+)
+parser.add_argument(
     "--experiment",
     type=str,
     default="experiment",
@@ -56,9 +63,11 @@ parser.add_argument(
     help="specify the range of the x and y",
 )
 
+parser.add_argument("--gpu", type=int, default=0, help="specify which gpu to use")
+
 args = parser.parse_args()
 args.path = os.path.join(args.path, args.experiment + "_last")
-dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+dev = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
 model = create_model(args).to(dev)
 model.load_state_dict(torch.load(args.path))
 crit = nn.CrossEntropyLoss()
@@ -85,7 +94,7 @@ data_ = {
     "Z": Z,
 }
 
-with open("data_", "wb") as f:
+with open(f"data_${args.batch_size}_${args.optim}", "wb") as f:
     pickle.dump(data_, f)
     f.close()
 
