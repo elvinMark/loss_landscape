@@ -7,6 +7,7 @@ from datasets import create_dataloaders
 from utils import get_landscape, create_random_directions, get_params_ref
 import matplotlib.pyplot as plt
 import pickle
+from pca import load_pca_directions
 
 parser = argparse.ArgumentParser(
     description="train a model and visualize the loss landscape"
@@ -64,6 +65,12 @@ parser.add_argument(
 )
 
 parser.add_argument("--gpu", type=int, default=0, help="specify which gpu to use")
+parser.add_argument(
+    "--pca",
+    type=str,
+    default=None,
+    help="specify the directory where the pca directions are stored",
+)
 
 args = parser.parse_args()
 args.path = os.path.join(args.path, args.experiment + "_last")
@@ -73,7 +80,14 @@ model.load_state_dict(torch.load(args.path))
 crit = nn.CrossEntropyLoss()
 train_dl, test_dl = create_dataloaders(args)
 base_w = get_params_ref(model)
-alpha, beta = create_random_directions(base_w, dev)
+
+if args.pca is None:
+    print("Creating random directions")
+    alpha, beta = create_random_directions(base_w, dev)
+else:
+    print("Loading the pca directions")
+    alpha, beta = load_pca_directions(dev)
+
 X, Y, Z = get_landscape(
     model,
     test_dl,
